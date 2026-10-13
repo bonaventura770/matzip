@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>네이버 맛동여지도 - 미슐랭 & 블루리본 맛집 큐레이션</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome & Phosphor Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts (Noto Sans KR) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Kakao Map SDK -->
+    <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=00447b8720df593c164f58cfcf04813f&libraries=services"></script>
+
+    <style>
+        * {
+            font-family: 'Noto Sans KR', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Custom Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Map Badge Animation */
+        .badge-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.05); }
+        }
+
+        /* Custom Kakao Overlay Styling */
+        .custom-overlay {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            padding: 6px 10px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+            border: 2px solid #03C75A;
+            font-weight: 700;
+            font-size: 13px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            transform: translateY(0);
+        }
+        .custom-overlay:hover {
+            transform: translateY(-4px) scale(1.05);
+            z-index: 50 !important;
+            box-shadow: 0 8px 20px rgba(3, 199, 90, 0.3);
+        }
+        .custom-overlay::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 6px 0 6px;
+            border-style: solid;
+            border-color: #03C75A transparent transparent transparent;
+        }
+        .custom-overlay.selected {
+            background: #03C75A;
+            color: white;
+            border-color: #029f47;
+        }
+        .custom-overlay.selected::after {
+            border-color: #029f47 transparent transparent transparent;
+        }
+
+        /* Drawer Slide Animations */
+        .drawer-slide-up {
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .bg-naver {
+            background-color: #03C75A;
+        }
+        .text-naver {
+            color: #03C75A;
+        }
+        .border-naver {
+            border-color: #03C75A;
+        }
+
+        /* Shimmer Loading Animation */
+        .shimmer {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen w-screen overflow-hidden flex flex-col antialiased select-none">
+
+    <!-- Top Navigation Header -->
+    <header class="h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 z-30 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+                <i class="fa-solid font-black text-xl text-white">🗺️</i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-extrabold text-lg text-slate-900 tracking-tight">네이버 <span class="text-naver">맛동여지도</span></span>
+                    <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full">2026 기획전</span>
+                </div>
+                <p class="text-xs text-slate-500 hidden sm:block">미슐랭 스타 & 블루리본 인증 맛집 단독 혜택 지도</p>
+            </div>
+        </div>
+
+        <!-- Quick Top Search Bar (Desktop) -->
+        <div class="hidden md:flex items-center relative max-w-md w-full mx-4">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-sm"></i>
+            <input id="desktopSearchInput" type="text" placeholder="식당명, 대표 메뉴(도토리국수, 곱창전골 등), 지역 검색" 
+                class="w-full pl-10 pr-10 py-2 text-sm bg-slate-100 border border-slate-200 rounded-full focus:outline-none focus:border-emerald-500 focus:bg-white transition-all">
+            <button id="clearDesktopSearch" class="hidden absolute right-3 text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-circle-xmark text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Actions Buttons -->
+        <div class="flex items-center gap-2">
+            <button id="savedToggleBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-all">
+                <i class="fa-solid fa-heart text-rose-500"></i>
+                <span class="hidden sm:inline">저장 목록</span>
+                <span id="savedCount" class="bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full">0</span>
+            </button>
+            <button id="shareBtn" class="p-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm transition-all" title="공유하기">
+                <i class="fa-solid fa-share-nodes"></i>
+            </button>
+            <button id="locationBtn" class="p-2 rounded-full bg-emerald-50 text-naver border border-emerald-200 hover:bg-emerald-100 text-sm transition-all" title="내 위치 주변 탐색">
+                <i class="fa-solid fa-location-crosshairs"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <!-- Sidebar Panel (List & Filters) -->
+        <aside id="sidebar" class="w-full md:w-[420px] lg:w-[460px] bg-white border-r border-slate-200 flex flex-col z-20 h-[50vh] md:h-full transition-all duration-300 relative shadow-lg md:shadow-none">
+            
+            <!-- Mobile Search Bar -->
+            <div class="p-3 border-b border-slate-100 md:hidden bg-slate-50">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
+                    <input id="mobileSearchInput" type="text" placeholder="맛집 또는 메뉴 검색..." 
+                        class="w-full pl-10 pr-8 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <!-- Promotion Header Banner -->
+            <div class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white p-3.5 shrink-0 relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+                <div class="flex justify-between items-start mb-1">
+                    <span class="text-[10px] uppercase font-extrabold tracking-wider bg-white/20 px-2 py-0.5 rounded text-emerald-100">월간 맛동여지도 혜택</span>
+                    <span class="text-xs text-emerald-100"><i class="fa-solid fa-circle-check mr-1"></i>네이버 예약 전액 지원</span>
+                </div>
+                <h2 class="text-sm font-bold leading-snug">선결제 시 5,000원 즉시 할인 + Npay 20% 적립</h2>
+                <p class="text-[11px] text-emerald-100/90 mt-1">인기 식당 예약 후 리뷰 작성 시 2,000p 추가 지급!</p>
+            </div>
+
+            <!-- Regional Quick Tabs -->
+            <div class="px-3 py-2 border-b border-slate-100 overflow-x-auto whitespace-nowrap bg-white flex gap-1.5 shrink-0 scrollbar-none" id="regionTabs">
+                <!-- Dynamically populated region tabs -->
+            </div>
+
+            <!-- Category & Badge Filter Chips -->
+            <div class="px-3 py-2 border-b border-slate-100 overflow-x-auto whitespace-nowrap bg-slate-50 flex items-center gap-1.5 shrink-0" id="filterChips">
+                <button data-filter="all" class="chip active px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600 text-white shadow-sm">전체보기</button>
+                <button data-filter="michelin" class="chip px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">🌟 미슐랭</button>
+                <button data-filter="blueribbon" class="chip px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">🎀 블루리본</button>
+                <button data-filter="benefit" class="chip px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">🎁 쿠폰혜택</button>
+                <button data-filter="tv" class="chip px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100">📺 TV방송</button>
+            </div>
+
+            <!-- Result Count & Sort Options Header -->
+            <div class="px-4 py-2 bg-white border-b border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
+                <div>
+                    총 <span id="placeCount" class="font-bold text-emerald-600">0</span>개의 맛집
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="sortSelect" class="bg-transparent border-none font-medium text-slate-700 focus:outline-none cursor-pointer">
+                        <option value="rating">별점 높은순</option>
+                        <option value="reviews">리뷰 많은순</option>
+                        <option value="discount">혜택 금액순</option>
+                        <option value="name">가나다순</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Restaurant List Scroll Area -->
+            <div id="restaurantList" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-2">
+                <!-- Dynamically injected restaurant cards -->
+            </div>
+
+            <!-- Footer info inside sidebar -->
+            <div class="p-3 border-t border-slate-100 text-center text-[11px] text-slate-400 shrink-0 bg-slate-50">
+                <p>© 2026 NAVER Place & Map Partners • 맛동여지도</p>
+            </div>
+        </aside>
+
+        <!-- Map View Container -->
+        <section class="flex-1 relative h-full bg-slate-100">
+            
+            <!-- Kakao Map Container Div -->
+            <div id="kakaoMap" class="w-full h-full"></div>
+
+            <!-- Floating Map Category Filter Widget (Top Left overlay) -->
+            <div class="absolute top-4 left-4 z-10 hidden sm:flex items-center gap-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl shadow-md border border-slate-200/80">
+                <button class="cuisine-filter active text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 text-white transition-all" data-category="all">전체</button>
+                <button class="cuisine-filter text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-category="한식">한식</button>
+                <button class="cuisine-filter text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-category="일식">일식</button>
+                <button class="cuisine-filter text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-category="양식">양식</button>
+                <button class="cuisine-filter text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-all" data-category="카페">카페/디저트</button>
+            </div>
+
+            <!-- Floating Map Tools (Right Side) -->
+            <div class="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                <button id="reboundBtn" class="w-10 h-10 bg-white rounded-xl shadow-md border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center justify-center text-sm font-bold transition-all" title="모든 마커 재정렬">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+                <button id="gpsBtn" class="w-10 h-10 bg-white rounded-xl shadow-md border border-slate-200 text-emerald-600 hover:bg-emerald-50 flex items-center justify-center text-sm font-bold transition-all" title="내 위치">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </button>
+            </div>
+
+            <!-- Floating Banner / Toast overlay -->
+            <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-md text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300">
+                <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+                <span id="toastMsg">알림 메시지</span>
+            </div>
+
+            <!-- Map Tooltip Overlay -->
+            <div id="mapTooltip" class="absolute hidden z-30 pointer-events-none bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-lg shadow-lg border border-slate-700"></div>
+        </section>
+    </main>
+
+    <!-- Detailed Restaurant Drawer Modal -->
+    <div id="detailModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden flex justify-end transition-opacity duration-300">
+        <div id="modalContainer" class="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-hidden transform translate-x-full transition-transform duration-300">
+            
+            <!-- Modal Header -->
+            <div class="relative bg-slate-900 text-white h-52 shrink-0">
+                <img id="detailImg" class="w-full h-full object-cover opacity-80" src="" alt="식당 대표 이미지">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent"></div>
+                
+                <button id="closeModalBtn" class="absolute top-4 right-4 w-9 h-9 bg-black/40 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-all">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+
+                <div class="absolute bottom-4 left-4 right-4 text-white">
+                    <div class="flex items-center gap-1.5 mb-1" id="detailBadges">
+                        <!-- Badges dynamically injected -->
+                    </div>
+                    <h2 id="detailTitle" class="text-2xl font-black text-white leading-tight"></h2>
+                    <p id="detailCategory" class="text-xs text-slate-300 mt-0.5"></p>
+                </div>
+            </div>
+
+            <!-- Modal Content Body -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-5">
+                
+                <!-- Ratings & Bookmarking Bar -->
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="text-center border-r border-slate-200 pr-3">
+                            <span class="block text-[10px] text-slate-400">네이버 평점</span>
+                            <span id="detailRating" class="text-lg font-black text-emerald-600">★ 4.8</span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-slate-400">방문자 리뷰</span>
+                            <span id="detailReviews" class="text-sm font-bold text-slate-700">1,240건</span>
+                        </div>
+                    </div>
+                    <button id="modalBookmarkBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition-all">
+                        <i class="fa-regular fa-heart"></i>
+                        <span>저장하기</span>
+                    </button>
+                </div>
+
+                <!-- Special Promo Coupon Box -->
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-extrabold text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded">2026 맛동여지도 혜택</span>
+                        <h4 class="text-sm font-bold text-slate-900 mt-1">5,000원 선결제 즉시 할인 쿠폰</h4>
+                        <p class="text-xs text-slate-600 mt-0.5">네이버 예약 시 자동으로 쿠폰이 적용됩니다.</p>
+                    </div>
+                    <button id="claimCouponBtn" class="bg-naver text-white px-3.5 py-2 rounded-xl font-extrabold text-xs shadow-md hover:bg-emerald-700 transition-all shrink-0">
+                        쿠폰받기
+                    </button>
+                </div>
+
+                <!-- Basic Info List -->
+                <div class="space-y-3 text-xs text-slate-700">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-location-dot text-slate-400 text-sm mt-0.5 w-4"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 block">주소</span>
+                            <span id="detailAddress" class="text-slate-600"></span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-clock text-slate-400 text-sm mt-0.5 w-4"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 block">영업시간</span>
+                            <span id="detailHours" class="text-slate-600">12:00 - 22:00 (브레이크타임 15:00-18:00)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-utensils text-slate-400 text-sm mt-0.5 w-4"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 block">대표 메뉴</span>
+                            <span id="detailMenu" class="text-slate-600 font-semibold text-emerald-700"></span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-phone text-slate-400 text-sm mt-0.5 w-4"></i>
+                        <div>
+                            <span class="font-bold text-slate-900 block">전화번호</span>
+                            <span id="detailPhone" class="text-slate-600"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Restaurant Description -->
+                <div>
+                    <h4 class="font-bold text-sm text-slate-900 mb-1.5">큐레이터 한줄평</h4>
+                    <p id="detailDesc" class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100"></p>
+                </div>
+
+                <!-- Navigation Quick Links -->
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <a id="naverBookingLink" href="#" target="_blank" class="flex items-center justify-center gap-2 bg-naver text-white py-3 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-md">
+                        <i class="fa-solid fa-calendar-check"></i> 네이버 예약하기
+                    </a>
+                    <a id="kakaoNaviLink" href="#" target="_blank" class="flex items-center justify-center gap-2 bg-amber-400 text-slate-900 py-3 rounded-xl font-bold text-xs hover:bg-amber-500 transition-all shadow-md">
+                        <i class="fa-solid fa-route"></i> 카카오 길찾기
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Standard Dataset for Matdong-yeojido Gourmet Collection
+        const RESTAURANTS = [
+            {
+                id: "res-1",
+                name: "모수 서울 (MOSU)",
+                category: "양식",
+                subCategory: "컨템포러리 다이닝",
+                region: "용산/이태원/한남",
+                lat: 37.539824,
+                lng: 126.998421,
+                address: "서울 용산구 회나무로41길 4",
+                michelin: "🌟 3스타",
+                blueRibbon: "🎀 3개",
+                tv: "흑백요리사 안성재 셰프",
+                benefit: "5,000원 할인",
+                rating: 4.95,
+                reviewCount: 3820,
+                price: "420,000원",
+                menu: "도토리 국수, 잉걸불 코스 요리",
+                phone: "02-793-5995",
+                hours: "화~토 17:00 - 23:00 (일,월 휴무)",
+                img: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+                desc: "넷플릭스 흑백요리사 심사위원 안성재 셰프의 미슐랭 3스타 레스토랑. 재료 본연의 맛을 극대화한 현대적 모던 다이닝.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-2",
+                name: "가겐 (Gaggen)",
+                category: "일식",
+                subCategory: "가이세키 오마카세",
+                region: "강남/압구정",
+                lat: 37.525141,
+                lng: 127.042861,
+                address: "서울 강남구 압구정로80길 19-1",
+                michelin: "🌟 1스타",
+                blueRibbon: "🎀 3개",
+                tv: "2026 신규 블루리본 3개",
+                benefit: "Npay 20% 적립",
+                rating: 4.92,
+                reviewCount: 1420,
+                price: "230,000원",
+                menu: "계절 가이세키 코스, 고사리 와라비모치",
+                phone: "02-511-1205",
+                hours: "화~토 19:00 - 22:30",
+                img: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80",
+                desc: "계절의 변화를 정교하게 담아내는 최현아·원진희 셰프의 전통 정통 일본식 가이세키 다이닝.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-3",
+                name: "능동미나리 성수점",
+                category: "한식",
+                subCategory: "곰탕 / 수육",
+                region: "성수/건대",
+                lat: 37.544839,
+                lng: 127.056214,
+                address: "서울 성동구 연무장길 42",
+                michelin: "셀렉티드",
+                blueRibbon: "🎀 2개",
+                tv: "줄서는식당 / 맛있는녀석들",
+                benefit: "5,000원 할인",
+                rating: 4.88,
+                reviewCount: 9410,
+                price: "15,000원",
+                menu: "능동 미나리곰탕, 미나리 수육전골",
+                phone: "02-461-1233",
+                hours: "매일 10:00 - 02:00",
+                img: "https://images.unsplash.com/photo-1541832676-9b763b0239ab?auto=format&fit=crop&w=800&q=80",
+                desc: "신선한 화악산 미나리를 아낌없이 올린 진한 곰탕과 살수육. 성수동 필수 방문 코스.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-4",
+                name: "소울다이닝 (Soul)",
+                category: "한식",
+                subCategory: "모던 한식",
+                region: "용산/이태원/한남",
+                lat: 37.543210,
+                lng: 126.987654,
+                address: "서울 용산구 신흥로26길 35 B1",
+                michelin: "🌟 1스타",
+                blueRibbon: "🎀 3개",
+                tv: "수요미식회 추천",
+                benefit: "리뷰 2천원 적립",
+                rating: 4.89,
+                reviewCount: 2150,
+                price: "150,000원",
+                menu: "포항 물회 감자전, 오리 보쌈 코스",
+                phone: "02-797-1201",
+                hours: "목~월 12:00 - 22:00",
+                img: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+                desc: "윤대현, 김희은 셰프 부부가 감각적으로 해석한 현대 한국인의 소울푸드 한식 다이닝.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-5",
+                name: "호빈 (Ambassador Haobin)",
+                category: "중식",
+                subCategory: "정통 광동식",
+                region: "종로/을지로/중구",
+                lat: 37.559812,
+                lng: 127.001923,
+                address: "서울 중구 동호로 287 앰배서더 풀만 2층",
+                michelin: "🌟 1스타",
+                blueRibbon: "🎀 3개",
+                tv: "중식 대가 후덕죽 셰프",
+                benefit: "5,000원 할인",
+                rating: 4.91,
+                reviewCount: 1840,
+                price: "162,000원",
+                menu: "후불도장, 광동식 전복구이",
+                phone: "02-2270-3141",
+                hours: "매일 11:30 - 22:00",
+                img: "https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=800&q=80",
+                desc: "한국 중식의 살아있는 전설 후덕죽 셰프가 선보이는 몸에 유익한 약식동원 정통 고급 중식.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-6",
+                name: "스시 소수헌",
+                category: "일식",
+                subCategory: "스시 오마카세",
+                region: "종로/을지로/중구",
+                lat: 37.556201,
+                lng: 126.969123,
+                address: "서울 중구 만리재로21길 8",
+                michelin: "🌟 1스타",
+                blueRibbon: "🎀 3개",
+                tv: "박경재 셰프 스시야",
+                benefit: "Npay 20% 적립",
+                rating: 4.96,
+                reviewCount: 890,
+                price: "300,000원",
+                menu: "스시 런치/디너 코스, 전어 니기리",
+                phone: "02-393-0100",
+                hours: "화~토 12:00 - 21:00",
+                img: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?auto=format&fit=crop&w=800&q=80",
+                desc: "국가유산 고택 리모델링 공간에서 즐기는 스시 거장 박경재 셰프의 고즈넉한 하이엔드 스시.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-7",
+                name: "정자 삼다돈 판교점",
+                category: "한식",
+                subCategory: "제주 흑돼지 구이",
+                region: "분당/판교",
+                lat: 37.394812,
+                lng: 127.111923,
+                address: "경기 성남시 분당구 판교역로 192번길 16",
+                michelin: "일반",
+                blueRibbon: "🎀 1개",
+                tv: "생생정보통 맛집",
+                benefit: "5,000원 할인",
+                rating: 4.83,
+                reviewCount: 4120,
+                price: "22,000원",
+                menu: "숙성 흑돼지 오겹살, 멜젓 볶음밥",
+                phone: "031-708-9292",
+                hours: "매일 11:30 - 22:30",
+                img: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+                desc: "판교 직장인들이 첫손에 꼽는 제주 숙성 흑돼지 전문점. 그릴링 서비스 제공.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-8",
+                name: "런던 베이글 뮤지엄 제주",
+                category: "카페",
+                subCategory: "베이커리 카페",
+                region: "제주도",
+                lat: 33.525890,
+                lng: 126.741230,
+                address: "제주 제주시 구좌읍 동복로 85",
+                michelin: "일반",
+                blueRibbon: "🎀 2개",
+                tv: "핫플레이스 No.1",
+                benefit: "리뷰 2천원 적립",
+                rating: 4.87,
+                reviewCount: 15420,
+                price: "5,500원",
+                menu: "쪽파 크림치즈 베이글, 감자치즈 베이글",
+                phone: "064-782-1230",
+                hours: "매일 08:00 - 18:00",
+                img: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80",
+                desc: "제주 에메랄드빛 바다 앞에서 즐기는 영국풍 오리지널 프리미엄 베이글 카페.",
+                naverUrl: "https://map.naver.com"
+            },
+            {
+                id: "res-9",
+                name: "모먼트 로컬 부산",
+                category: "양식",
+                subCategory: "스테이크하우스",
+                region: "부산/해운대",
+                lat: 35.158912,
+                lng: 129.160123,
+                address: "부산 해운대구 해운대해변로 298",
+                michelin: "NEW 2026",
+                blueRibbon: "🎀 2개",
+                tv: "해운대 오션뷰 다이닝",
+                benefit: "5,000원 할인",
+                rating: 4.90,
+                reviewCount: 1980,
+                price: "85,000원",
+                menu: "드라이에이징 티본 스테이크, 성게알 파스타",
+                phone: "051-740-1234",
+                hours: "매일 12:00 - 22:00",
+                img: "https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=800&q=80",
+                desc: "해운대 바다 전경을 바라보며 최고급 숙성 한우 스테이크와 와인 페어링을 즐기는 스페셜 공간.",
+                naverUrl: "https://map.naver.com"
+            }
+        ];
+
+        let state = {
+            places: [...RESTAURANTS],
+            selectedRegion: "전체",
+            selectedFilter: "all",
+            selectedCategory: "all",
+            searchKeyword: "",
+            sortBy: "rating",
+            savedIds: JSON.parse(localStorage.getItem('saved_restaurants') || '[]'),
+            selectedPlaceId: null,
+            kakaoMap: null,
+            markers: [],
+            overlays: []
+        };
+
+        const REGIONS = ["전체", "성수/건대", "용산/이태원/한남", "강남/압구정", "종로/을지로/중구", "분당/판교", "부산/해운대", "제주도"];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderRegionTabs();
+            renderRestaurantList();
+            updateSavedCount();
+            setupEventListeners();
+            initMap();
+        });
+
+        // Initialize Kakao Map with Fallback logic if domain authorization fails
+        function initMap() {
+            const mapContainer = document.getElementById('kakaoMap');
+
+            // Handle SDK load failure or unverified domain
+            if (typeof kakao === 'undefined' || !kakao || !kakao.maps) {
+                renderMapError(mapContainer);
+                return;
+            }
+
+            try {
+                const options = {
+                    center: new kakao.maps.LatLng(37.544839, 127.056214), // 성수 중심
+                    level: 8
+                };
+                state.kakaoMap = new kakao.maps.Map(mapContainer, options);
+
+                // Add Controls
+                const mapTypeControl = new kakao.maps.MapTypeControl();
+                state.kakaoMap.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+
+                const zoomControl = new kakao.maps.ZoomControl();
+                state.kakaoMap.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+                // Render Map Markers
+                updateMapMarkers();
+
+            } catch (err) {
+                console.error("Kakao Map init failed:", err);
+                renderMapError(mapContainer);
+            }
+        }
+
+        // Render friendly error message if Kakao Map fails to load on localhost
+        function renderMapError(container) {
+            container.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center p-6 bg-slate-100 text-center">
+                    <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center text-2xl mb-4 shadow-inner">
+                        <i class="fa-solid fa-map-location-dot"></i>
+                    </div>
+                    <h3 class="font-extrabold text-base text-slate-800 mb-2">카카오 지도 로드 안내 (도메인 설정)</h3>
+                    <p class="text-xs text-slate-600 max-w-sm mb-4 leading-relaxed">
+                        현재 도메인(localhost 등)이 카카오 디벨로퍼스 콘솔에 등록되지 않은 경우 지도가 표기되지 않을 수 있습니다.<br>
+                        <b>식당 목록 및 큐레이션 상세 정보는 정상 작동합니다!</b>
+                    </p>
+                    <a href="https://developers.kakao.com" target="_blank" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-emerald-700">
+                        카카오 디벨로퍼스에 도메인 등록하기
+                    </a>
+                </div>
+            `;
+        }
+
+        function updateMapMarkers() {
+            if (!state.kakaoMap || typeof kakao === 'undefined' || !kakao.maps) return;
+
+            // Clear existing markers & overlays
+            state.overlays.forEach(overlay => overlay.setMap(null));
+            state.overlays = [];
+
+            const bounds = new kakao.maps.LatLngBounds();
+
+            state.places.forEach(place => {
+                const position = new kakao.maps.LatLng(place.lat, place.lng);
+                bounds.extend(position);
+
+                // Custom Overlay HTML
+                const content = document.createElement('div');
+                const isSelected = place.id === state.selectedPlaceId;
+                content.className = `custom-overlay ${isSelected ? 'selected' : ''}`;
+                content.innerHTML = `
+                    <span>${place.michelin.includes('스타') ? '🌟' : '🎀'}</span>
+                    <span>${place.name}</span>
+                `;
+
+                content.onclick = () => {
+                    selectPlace(place.id);
+                };
+
+                const customOverlay = new kakao.maps.CustomOverlay({
+                    position: position,
+                    content: content,
+                    yAnchor: 1.2
+                });
+
+                customOverlay.setMap(state.kakaoMap);
+                state.overlays.push(customOverlay);
+            });
+
+            if (state.places.length > 0) {
+                state.kakaoMap.setBounds(bounds);
+            }
+        }
+
+        function renderRegionTabs() {
+            const container = document.getElementById('regionTabs');
+            container.innerHTML = REGIONS.map(reg => `
+                <button class="region-tab px-3 py-1 rounded-full text-xs font-bold transition-all ${state.selectedRegion === reg ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}"
+                    onclick="filterRegion('${reg}')">
+                    ${reg}
+                </button>
+            `).join('');
+        }
+
+        function filterRegion(reg) {
+            state.selectedRegion = reg;
+            renderRegionTabs();
+            applyFilters();
+        }
+
+        function applyFilters() {
+            let filtered = RESTAURANTS.filter(r => {
+                // Region filter
+                if (state.selectedRegion !== "전체" && r.region !== state.selectedRegion) return false;
+
+                // Category filter
+                if (state.selectedCategory !== "all" && r.category !== state.selectedCategory) return false;
+
+                // Search keyword
+                if (state.searchKeyword.trim() !== "") {
+                    const kw = state.searchKeyword.toLowerCase();
+                    const matchName = r.name.toLowerCase().includes(kw);
+                    const matchMenu = r.menu.toLowerCase().includes(kw);
+                    const matchRegion = r.region.toLowerCase().includes(kw);
+                    if (!matchName && !matchMenu && !matchRegion) return false;
+                }
+
+                // Badge Chips filter
+                if (state.selectedFilter === "michelin" && !r.michelin.includes("스타")) return false;
+                if (state.selectedFilter === "blueribbon" && !r.blueRibbon.includes("🎀")) return false;
+                if (state.selectedFilter === "benefit" && !r.benefit) return false;
+                if (state.selectedFilter === "tv" && !r.tv) return false;
+                if (state.selectedFilter === "saved" && !state.savedIds.includes(r.id)) return false;
+
+                return true;
+            });
+
+            // Sorting
+            filtered.sort((a, b) => {
+                if (state.sortBy === "rating") return b.rating - a.rating;
+                if (state.sortBy === "reviews") return b.reviewCount - a.reviewCount;
+                if (state.sortBy === "name") return a.name.localeCompare(b.name);
+                return 0;
+            });
+
+            state.places = filtered;
+            document.getElementById('placeCount').innerText = filtered.length;
+            renderRestaurantList();
+            updateMapMarkers();
+        }
+
+        function renderRestaurantList() {
+            const container = document.getElementById('restaurantList');
+
+            if (state.places.length === 0) {
+                container.innerHTML = `
+                    <div class="py-12 text-center text-slate-400">
+                        <i class="fa-solid fa-utensils text-3xl mb-2 text-slate-300"></i>
+                        <p class="text-xs font-semibold">조건에 맞는 맛집이 없습니다.</p>
+                        <button onclick="resetFilters()" class="mt-3 text-xs text-emerald-600 underline font-bold">필터 초기화</button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.places.map(p => {
+                const isSaved = state.savedIds.includes(p.id);
+                return `
+                    <div class="restaurant-card group bg-white hover:bg-slate-50 border border-slate-100 p-3 rounded-2xl transition-all duration-200 cursor-pointer flex gap-3 shadow-sm hover:shadow-md"
+                        onclick="selectPlace('${p.id}')">
+                        <img src="${p.img}" alt="${p.name}" class="w-24 h-24 rounded-xl object-cover shrink-0 group-hover:scale-105 transition-transform duration-300">
+                        
+                        <div class="flex-1 flex flex-col justify-between overflow-hidden">
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">${p.region} • ${p.category}</span>
+                                    <button onclick="event.stopPropagation(); toggleSave('${p.id}')" class="text-slate-300 hover:text-rose-500 transition-colors p-1">
+                                        <i class="fa-${isSaved ? 'solid' : 'regular'} fa-heart ${isSaved ? 'text-rose-500' : ''}"></i>
+                                    </button>
+                                </div>
+                                <h3 class="font-extrabold text-sm text-slate-900 group-hover:text-emerald-600 transition-colors truncate mt-1">${p.name}</h3>
+                                <p class="text-xs text-slate-500 truncate mt-0.5">${p.menu}</p>
+                            </div>
+
+                            <div class="flex items-center gap-2 mt-2 text-[11px] font-semibold text-slate-600">
+                                <span class="text-amber-500 font-bold">★ ${p.rating}</span>
+                                <span class="text-slate-300">|</span>
+                                <span>리뷰 ${p.reviewCount.toLocaleString()}</span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 mt-1.5">
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">${p.michelin}</span>
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">${p.blueRibbon}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectPlace(placeId) {
+            state.selectedPlaceId = placeId;
+            const place = RESTAURANTS.find(p => p.id === placeId);
+            if (!place) return;
+
+            // Pan map
+            if (state.kakaoMap && typeof kakao !== 'undefined') {
+                const pos = new kakao.maps.LatLng(place.lat, place.lng);
+                state.kakaoMap.panTo(pos);
+            }
+
+            // Open Detail Modal
+            openDetailModal(place);
+            updateMapMarkers();
+        }
+
+        function openDetailModal(p) {
+            const modal = document.getElementById('detailModal');
+            const container = document.getElementById('modalContainer');
+
+            document.getElementById('detailImg').src = p.img;
+            document.getElementById('detailTitle').innerText = p.name;
+            document.getElementById('detailCategory').innerText = `${p.region} • ${p.category} (${p.subCategory})`;
+            document.getElementById('detailRating').innerText = `★ ${p.rating}`;
+            document.getElementById('detailReviews').innerText = `${p.reviewCount.toLocaleString()}건`;
+            document.getElementById('detailAddress').innerText = p.address;
+            document.getElementById('detailHours').innerText = p.hours;
+            document.getElementById('detailMenu').innerText = p.menu;
+            document.getElementById('detailPhone').innerText = p.phone;
+            document.getElementById('detailDesc').innerText = p.desc;
+
+            // Badges
+            document.getElementById('detailBadges').innerHTML = `
+                <span class="px-2 py-0.5 bg-amber-400 text-slate-900 font-extrabold text-[10px] rounded-full">${p.michelin}</span>
+                <span class="px-2 py-0.5 bg-blue-600 text-white font-extrabold text-[10px] rounded-full">${p.blueRibbon}</span>
+            `;
+
+            // Bookmark state
+            const isSaved = state.savedIds.includes(p.id);
+            const bmBtn = document.getElementById('modalBookmarkBtn');
+            bmBtn.innerHTML = `
+                <i class="fa-${isSaved ? 'solid' : 'regular'} fa-heart text-rose-500"></i>
+                <span>${isSaved ? '저장됨' : '저장하기'}</span>
+            `;
+            bmBtn.onclick = () => toggleSave(p.id);
+
+            // Coupon Action
+            document.getElementById('claimCouponBtn').onclick = () => {
+                showToast(`🎁 [${p.name}] 5,000원 할인 쿠폰 발급 완료!`);
+            };
+
+            // Links
+            document.getElementById('naverBookingLink').href = p.naverUrl;
+            document.getElementById('kakaoNaviLink').href = `https://map.kakao.com/link/to/${p.name},${p.lat},${p.lng}`;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                container.classList.remove('translate-x-full');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('detailModal');
+            const container = document.getElementById('modalContainer');
+            container.classList.add('translate-x-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function toggleSave(placeId) {
+            const idx = state.savedIds.indexOf(placeId);
+            if (idx > -1) {
+                state.savedIds.splice(idx, 1);
+                showToast("저장 목록에서 삭제되었습니다.");
+            } else {
+                state.savedIds.push(placeId);
+                showToast("💖 저장 목록에 추가되었습니다!");
+            }
+            localStorage.setItem('saved_restaurants', JSON.stringify(state.savedIds));
+            updateSavedCount();
+            applyFilters();
+
+            if (state.selectedPlaceId === placeId) {
+                const place = RESTAURANTS.find(p => p.id === placeId);
+                if (place) openDetailModal(place);
+            }
+        }
+
+        function updateSavedCount() {
+            document.getElementById('savedCount').innerText = state.savedIds.length;
+        }
+
+        function resetFilters() {
+            state.selectedRegion = "전체";
+            state.selectedCategory = "all";
+            state.selectedFilter = "all";
+            state.searchKeyword = "";
+            document.getElementById('desktopSearchInput').value = "";
+            document.getElementById('mobileSearchInput').value = "";
+            renderRegionTabs();
+            applyFilters();
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgSpan = document.getElementById('toastMsg');
+            msgSpan.innerText = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2500);
+        }
+
+        function setupEventListeners() {
+            // Close Modal Events
+            document.getElementById('closeModalBtn').onclick = closeModal;
+            document.getElementById('detailModal').onclick = (e) => {
+                if (e.target.id === 'detailModal') closeModal();
+            };
+
+            // Search Inputs
+            const desktopSearch = document.getElementById('desktopSearchInput');
+            const mobileSearch = document.getElementById('mobileSearchInput');
+
+            const handleSearch = (e) => {
+                state.searchKeyword = e.target.value;
+                applyFilters();
+            };
+
+            desktopSearch.addEventListener('input', handleSearch);
+            mobileSearch.addEventListener('input', handleSearch);
+
+            // Filter Chips Click
+            document.querySelectorAll('#filterChips .chip').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('#filterChips .chip').forEach(c => {
+                        c.classList.remove('bg-emerald-600', 'text-white', 'active');
+                        c.classList.add('bg-white', 'text-slate-700');
+                    });
+                    btn.classList.add('bg-emerald-600', 'text-white', 'active');
+                    btn.classList.remove('bg-white', 'text-slate-700');
+
+                    state.selectedFilter = btn.dataset.filter;
+                    applyFilters();
+                };
+            });
+
+            // Category Floating Filters
+            document.querySelectorAll('.cuisine-filter').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.cuisine-filter').forEach(c => {
+                        c.classList.remove('bg-emerald-600', 'text-white');
+                        c.classList.add('text-slate-600');
+                    });
+                    btn.classList.add('bg-emerald-600', 'text-white');
+                    btn.classList.remove('text-slate-600');
+
+                    state.selectedCategory = btn.dataset.category;
+                    applyFilters();
+                };
+            });
+
+            // Sort Select
+            document.getElementById('sortSelect').onchange = (e) => {
+                state.sortBy = e.value;
+                applyFilters();
+            };
+
+            // Saved Toggle Btn
+            document.getElementById('savedToggleBtn').onclick = () => {
+                state.selectedFilter = state.selectedFilter === "saved" ? "all" : "saved";
+                applyFilters();
+            };
+
+            // Rebound & GPS
+            document.getElementById('reboundBtn').onclick = () => {
+                updateMapMarkers();
+                showToast("지도 마커 위치를 전체 재설정했습니다.");
+            };
+
+            document.getElementById('gpsBtn').onclick = () => {
+                if (navigator.geolocation && state.kakaoMap) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        const moveLatLon = new kakao.maps.LatLng(lat, lng);
+                        state.kakaoMap.panTo(moveLatLon);
+                        showToast("현재 내 위치로 이동했습니다.");
+                    }, () => {
+                        showToast("위치 정보를 불러올 수 없습니다.");
+                    });
+                }
+            };
+
+            // Share Btn
+            document.getElementById('shareBtn').onclick = () => {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(window.location.href);
+                    showToast("🔗 맛동여지도 링크가 복사되었습니다!");
+                }
+            };
+        }
+    </script>
+</body>
+</html>
